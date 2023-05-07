@@ -1,4 +1,5 @@
-import { Injectable } from '@angular/core';
+import { Injectable, Inject} from '@angular/core';
+import { APP_BASE_HREF } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { Vector2 } from 'three';
 
@@ -15,7 +16,7 @@ export class GridService {
     pheromoneDecayRate: number = 0.0005;
     private lastDiffusionTime: number = Date.now();
     private diffusionInterval: number = 100;
-    constructor(private http: HttpClient) {}
+    constructor(private http: HttpClient, @Inject(APP_BASE_HREF) private baseHref: string) {}
 
     public initializeGrid(width: number, height: number, cellSize: number = 16): void {
         this.grid = new Grid(width, height, cellSize);
@@ -305,9 +306,10 @@ export class GridService {
     }
 
     public async loadDefaultGrid(): Promise<void> {
-        const file = await this.http.get('/assets/default_grid.json', { responseType: 'text' }).toPromise() as string;
+        const file = await this.http.get(this.baseHref + 'assets/default_grid.json', { responseType: 'text' }).toPromise() as string;
         await this.loadGridFromFileContent(file);
     }
+      
 
     async loadGridFromFile(file: File): Promise<void> {
         return new Promise<void>((resolve, reject) => {
