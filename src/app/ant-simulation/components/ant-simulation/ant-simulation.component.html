@@ -1,0 +1,32 @@
+
+<select [(ngModel)]="selectedCellType">
+    <option [ngValue]="cellType" *ngFor="let cellType of cellTypes">{{cellType}}</option>
+</select>
+<label for="brushSize">Brush Size:</label>
+<input type="range" id="brushSize" name="brushSize" min="1" max="5" [(ngModel)]="brushSize">
+
+<br>
+<button (click)="clearGrid()">Clear Grid</button>
+<br>
+<label for="decay">Pheromone decay rate (larger is faster):</label>
+<input
+    type="range"
+    id="decay"
+    min="0.00001"
+    max=".01"
+    step="0.0005"
+    [(ngModel)]="pheromoneDecayRate"
+/>
+<input class="small-input" type="text" [(ngModel)]="pheromoneDecayRate" (input)="onPheromoneDecayChange($event)"/>
+<br>
+<button (click)="clearAllAnts()">Clear ants</button>
+<button (click)="toggleSearchingAnts()">Toggle Searching Ants</button>
+<button (click)="toggleFoodCarryingAnts()">Toggle Food-Carrying Ants</button>
+<br>
+<button (click)="startSimulation()">Start</button>
+<button (click)="stopSimulation()">Pause</button>
+<br>
+<canvas #simulationCanvas (mousedown)="onMouseDown($event)" (mousemove)="onMouseMove($event)" (mouseup)="onMouseUp()" (mouseleave)="onMouseUp()"></canvas>
+<br>
+<input type="file" (change)="loadGrid($event)" />
+<button (click)="saveGrid()">Save Grid</button>
