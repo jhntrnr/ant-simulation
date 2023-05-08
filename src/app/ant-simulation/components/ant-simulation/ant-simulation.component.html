@@ -23,9 +23,16 @@
 <button (click)="toggleSearchingAnts()">Toggle Searching Ants</button>
 <button (click)="toggleFoodCarryingAnts()">Toggle Food-Carrying Ants</button>
 <br>
-<button (click)="startSimulation()">Start</button>
-<button (click)="stopSimulation()">Pause</button>
-<br>
+<div>
+    <button (click)="startSimulation()">Start</button>
+    <button (click)="stopSimulation()">Pause</button>
+    <label for="viewMode">View Mode: </label>
+    <select id="viewMode" [(ngModel)]="viewMode">
+        <option *ngFor="let mode of viewModes()" [ngValue]="mode">{{ mode }}</option>
+    </select>
+    <button (click)="toggleSearchingPheromone()">Toggle Search Pheromone</button>
+<button (click)="toggleReturnPheromone()">Toggle Return Pheromone</button>
+</div>
 <canvas #simulationCanvas (mousedown)="onMouseDown($event)" (mousemove)="onMouseMove($event)" (mouseup)="onMouseUp()" (mouseleave)="onMouseUp()"></canvas>
 <br>
 <input type="file" (change)="loadGrid($event)" />

@@ -36,7 +36,7 @@ export class AntService {
 
     public moveAnts(gridService: GridService): void {
         const visionRange = 3;
-        const grabRange = 0.6;
+        const grabRange = 1;
         const cellSize = gridService.grid.cellSize;
         let antsDying: Ant[] = [];
         for (const ant of this.ants) {
@@ -50,7 +50,7 @@ export class AntService {
             if (ant.state === AntState.FoodSearch && nearbyCellsLineOfSight.length > 0) {
                 const foodCell = nearbyCellsLineOfSight.find(cell => cell.type === CellType.FoodSpawn);
                 if(foodCell !== undefined && ant.position.distanceTo(foodCell.position) <= visionRange * cellSize) {
-                    if(ant.position.distanceTo(foodCell.position) < grabRange){
+                    if(ant.position.distanceTo(foodCell.position.clone().add(new Vector2(0.5,0.5))) < grabRange){
                         ant.setFoodCarrying(true);
                     }
                     else{
@@ -62,7 +62,7 @@ export class AntService {
             } else if (ant.state === AntState.HomeSearch && nearbyCellsLineOfSight.some(cell => cell.type === CellType.AntSpawn)) {
                 const antSpawnCell = nearbyCellsLineOfSight.find(cell => cell.type === CellType.AntSpawn);
                 if(antSpawnCell !== undefined){
-                    if(ant.position.distanceTo(antSpawnCell.position) < grabRange){
+                    if(ant.position.distanceTo(antSpawnCell.position.clone().add(new Vector2(0.5,0.5))) < grabRange){
                         ant.setFoodCarrying(false);
                     }
                     else{

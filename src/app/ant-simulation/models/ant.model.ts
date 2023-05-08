@@ -20,7 +20,7 @@ export class Ant {
     public position: Vector2;
     public velocity: Vector2;
     public acceleration: Vector2;
-    public goalReached: boolean = false;
+    public goalReached: boolean = true;
     strongPheromoneTime: number = 50;
 
     constructor(x: number, y: number) {
@@ -87,18 +87,25 @@ export class Ant {
             const directionToCell = cellCenter.clone().sub(this.position).normalize();
             const angleToCell = this.velocity.angleTo(directionToCell);
     
-            if (Math.abs(angleToCell) < visionAngle && pheromoneValue > highestPheromoneValue) {
-                highestPheromoneValue = pheromoneValue;
+            if (Math.abs(angleToCell) < visionAngle && pheromoneValue.length() > highestPheromoneValue) {
+                highestPheromoneValue = pheromoneValue.length();
                 targetCell = cell;
             }
         }
     
         if (targetCell) {
-            const targetPosition = new Vector2(targetCell.x + 0.5, targetCell.y + 0.5);
+            const pheromoneValue = this.state === AntState.FoodSearch
+                ? targetCell.returnPheromone.clone().normalize().negate()
+                : targetCell.searchPheromone.clone().normalize().negate();
+
+            const moveTarget = new Vector2((targetCell.x + (0.5)) + Math.random() - 0.5, (targetCell.y + (0.5)) + Math.random() - 0.5);
+            const targetPosition = moveTarget.clone().add(pheromoneValue);
+    
             desired.copy(this.moveToward(targetPosition));
         }
         return desired;
     }
+    
 
     avoidObstacles(cells: Cell[], gridService: GridService, desiredVelocity: Vector2): void {
         const avoidRadius = 0.75;
@@ -171,16 +178,16 @@ export class Ant {
 
         if (this.strongPheromoneTime > 0) {
             if (this.state === AntState.FoodSearch) {
-                cell.searchPheromone = Math.min(cell.searchPheromone + 0.02, 1); // Adjust the strong pheromone strength
+                cell.searchPheromone.add(this.velocity.clone().multiplyScalar(0.02)).clampLength(0,1);
             } else {
-                cell.returnPheromone = Math.min(cell.returnPheromone + 0.02, 1); // Adjust the strong pheromone strength
+                cell.returnPheromone.add(this.velocity.clone().multiplyScalar(0.02)).clampLength(0,1);
             }
             this.strongPheromoneTime -= 1;
         } else {
             if (this.state === AntState.FoodSearch) {
-                cell.searchPheromone = Math.min(cell.searchPheromone + 0.01, 1);
+                cell.searchPheromone.add(this.velocity.clone().multiplyScalar(0.01)).clampLength(0,1);
             } else {
-                cell.returnPheromone = Math.min(cell.returnPheromone + 0.01, 1);
+                cell.returnPheromone.add(this.velocity.clone().multiplyScalar(0.01)).clampLength(0,1);
             }
         }
     }

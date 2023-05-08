@@ -10,8 +10,8 @@ export enum CellType {
 }
 
 export class Cell {
-    public searchPheromone: number;
-    public returnPheromone: number;
+    public searchPheromone: Vector2;
+    public returnPheromone: Vector2;
     public avoidPheromone: number;
     public position: Vector2;
 
@@ -19,8 +19,8 @@ export class Cell {
         public x: number,
         public y: number,
         public type: CellType,
-        searchPheromone: number = 0,
-        returnPheromone: number = 0,
+        searchPheromone: Vector2 = new Vector2(0,0),
+        returnPheromone: Vector2 = new Vector2(0,0),
         avoidPheromone: number = 0,
     ) {
         this.searchPheromone = searchPheromone;

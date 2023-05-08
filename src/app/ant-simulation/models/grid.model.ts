@@ -1,3 +1,4 @@
+import { Vector2 } from 'three';
 import { Cell, CellType } from './cell.model';
 
 export class Grid {
@@ -34,8 +35,8 @@ export class Grid {
     public setAllPheromonesToZero(): void {
         this.cells.forEach((row: Cell[]) => {
             row.forEach((cell: Cell) => {
-                cell.searchPheromone = 0;
-                cell.returnPheromone = 0;
+                cell.searchPheromone = new Vector2(0,0);
+                cell.returnPheromone = new Vector2(0,0);
                 cell.avoidPheromone = 0;
             });
         });

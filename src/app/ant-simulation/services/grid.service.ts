@@ -13,7 +13,7 @@ import { saveAs } from 'file-saver';
 })
 export class GridService {
     grid!: Grid;
-    pheromoneDecayRate: number = 0.0005;
+    pheromoneDecayRate: number = 0.0015;
     private lastDiffusionTime: number = Date.now();
     private diffusionInterval: number = 100;
     constructor(private http: HttpClient, private location: Location) {}
@@ -32,17 +32,23 @@ export class GridService {
             for (let x = 0; x < this.width; x++) {
                 const cell = this.getCell(x, y);
                 if (cell) {
-                    cell.updateCell(antService);
-                    cell.returnPheromone = Math.max(0, cell.returnPheromone - dissipationRate);
-                    cell.searchPheromone = Math.max(0, cell.searchPheromone - dissipationRate);
+                    cell.updateCell(antService); //Update the cells here to save iterating over the grid an additional time
+                    cell.returnPheromone.multiplyScalar(Math.max(0, 1 - dissipationRate));
+                    cell.searchPheromone.multiplyScalar(Math.max(0, 1 - dissipationRate));
+                    if (cell.returnPheromone.length() < .0000001) {
+                        cell.returnPheromone.set(0, 0);
+                    }
+                    if (cell.searchPheromone.length() < .0000001) {
+                        cell.searchPheromone.set(0, 0);
+                    }
                     cell.avoidPheromone = Math.max(0, cell.avoidPheromone - dissipationRate);
                 }
             }
         }
     }
-
+    
     diffusePheromones(): void {
-        const diffusionRate = 0.001;
+        const diffusionRate = 0.01;
         const currentTime = Date.now();
         if (currentTime - this.lastDiffusionTime < this.diffusionInterval) {
             return;
@@ -62,25 +68,25 @@ export class GridService {
         for (let y = 0; y < this.height; y++) {
             for (let x = 0; x < this.width; x++) {
                 const currentCell = this.getCell(x, y);
-                if (currentCell === undefined) {
+                if (currentCell === undefined || currentCell.type != CellType.Blank) {
                     continue;
                 }
                 const neighbors = this.getNeighboringCells(x, y);
     
                 for (const neighbor of neighbors) {
-                    const totalSearchPheromoneToDistribute = currentCell.searchPheromone * diffusionRate;
-                    const totalReturnPheromoneToDistribute = currentCell.returnPheromone * diffusionRate;
+                    const searchPheromoneToDistribute = currentCell.searchPheromone.clone().multiplyScalar(diffusionRate);
+                    const returnPheromoneToDistribute = currentCell.returnPheromone.clone().multiplyScalar(diffusionRate);
                     const totalAvoidPheromoneToDistribute = currentCell.avoidPheromone * diffusionRate;
     
-                    const searchPheromoneToAdd = totalSearchPheromoneToDistribute / neighbors.length;
-                    const returnPheromoneToAdd = totalReturnPheromoneToDistribute / neighbors.length;
+                    const searchPheromoneToAdd = searchPheromoneToDistribute.clone().divideScalar(neighbors.length);
+                    const returnPheromoneToAdd = returnPheromoneToDistribute.clone().divideScalar(neighbors.length);
                     const avoidPheromoneToAdd = totalAvoidPheromoneToDistribute / neighbors.length;
     
-                    tempGrid[neighbor.y][neighbor.x].searchPheromone += searchPheromoneToAdd;
-                    tempGrid[y][x].searchPheromone -= searchPheromoneToAdd;
+                    tempGrid[neighbor.y][neighbor.x].searchPheromone.add(searchPheromoneToAdd);
+                    tempGrid[y][x].searchPheromone.sub(searchPheromoneToAdd);
     
-                    tempGrid[neighbor.y][neighbor.x].returnPheromone += returnPheromoneToAdd;
-                    tempGrid[y][x].returnPheromone -= returnPheromoneToAdd;
+                    tempGrid[neighbor.y][neighbor.x].returnPheromone.add(returnPheromoneToAdd);
+                    tempGrid[y][x].returnPheromone.sub(returnPheromoneToAdd);
     
                     tempGrid[neighbor.y][neighbor.x].avoidPheromone += avoidPheromoneToAdd;
                     tempGrid[y][x].avoidPheromone -= avoidPheromoneToAdd;
@@ -95,13 +101,13 @@ export class GridService {
                 if (currentCell === undefined) {
                     continue;
                 }
-                currentCell.searchPheromone += tempGrid[y][x].searchPheromone;
-                currentCell.returnPheromone += tempGrid[y][x].returnPheromone;
+                currentCell.searchPheromone.add(tempGrid[y][x].searchPheromone);
+                currentCell.returnPheromone.add(tempGrid[y][x].returnPheromone);
                 currentCell.avoidPheromone += tempGrid[y][x].avoidPheromone;
             }
         }
     }
-
+    
     getNeighboringCells(x: number, y: number): Cell[] {
         const neighboringCells: Cell[] = [];
     
@@ -115,7 +121,7 @@ export class GridService {
     
                 if (this.isWithinBounds(neighborX, neighborY)) {
                     const neighbor = this.getCell(neighborX, neighborY);
-                    if (neighbor) {
+                    if (neighbor && neighbor.type === CellType.Blank) {
                         neighboringCells.push(neighbor);
                     }
                 }
@@ -288,8 +294,8 @@ export class GridService {
         type CellMirror = { x: number,
             y: number,
             type: CellType,
-            searchPheromone?: number,
-            returnPheromone?: number,
+            searchPheromone?: Vector2,
+            returnPheromone?: Vector2,
             avoidPheromone?: number}
         gridCopy.forEach((row: Cell[], rowIndex: number) => {
             row.forEach((cell: Cell, colIndex: number) => {
