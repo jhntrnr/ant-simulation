@@ -55,7 +55,6 @@ export class AntSimulationComponent implements OnInit, AfterViewInit {
     startSimulation(): void {
         if(this.running) return;
         this.running = true;
-        this.draw();
     }
 
     stopSimulation(): void {
@@ -68,13 +67,13 @@ export class AntSimulationComponent implements OnInit, AfterViewInit {
     }
 
     private draw(): void {
-        if (!this.running) return;
-
         this.context.clearRect(0, 0, this.canvas.nativeElement.width, this.canvas.nativeElement.height);
         this.drawGrid();
         this.drawAnts();
-        this.antService.updateAnts();
-        this.gridService.updateGrid(this.antService);
+        if (this.running){
+            this.antService.updateAnts();
+            this.gridService.updateGrid(this.antService);
+        }
 
         requestAnimationFrame(() => this.draw());
     }
