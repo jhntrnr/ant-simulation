@@ -1,39 +1,97 @@
-
-<select [(ngModel)]="selectedCellType">
-    <option [ngValue]="cellType" *ngFor="let cellType of cellTypes">{{cellType}}</option>
-</select>
-<label for="brushSize">Brush Size:</label>
-<input type="range" id="brushSize" name="brushSize" min="1" max="5" [(ngModel)]="brushSize">
-
-<br>
-<button (click)="clearGrid()">Clear Grid</button>
-<br>
-<label for="decay">Pheromone decay rate (larger is faster):</label>
-<input
-    type="range"
-    id="decay"
-    min="0.00001"
-    max=".01"
-    step="0.0005"
-    [(ngModel)]="pheromoneDecayRate"
-/>
-<input class="small-input" type="text" [(ngModel)]="pheromoneDecayRate" (input)="onPheromoneDecayChange($event)"/>
-<br>
-<button (click)="clearAllAnts()">Clear ants</button>
-<button (click)="toggleSearchingAnts()">Toggle Searching Ants</button>
-<button (click)="toggleFoodCarryingAnts()">Toggle Food-Carrying Ants</button>
-<br>
-<div>
-    <button (click)="startSimulation()">Start</button>
-    <button (click)="stopSimulation()">Pause</button>
-    <label for="viewMode">View Mode: </label>
-    <select id="viewMode" [(ngModel)]="viewMode">
-        <option *ngFor="let mode of viewModes()" [ngValue]="mode">{{ mode }}</option>
-    </select>
-    <button (click)="toggleSearchingPheromone()">Toggle Search Pheromone</button>
-<button (click)="toggleReturnPheromone()">Toggle Return Pheromone</button>
+<div class="simulation">
+    <canvas #simulationCanvas (mousedown)="onMouseDown($event)" (mousemove)="onMouseMove($event)" (mouseup)="onMouseUp()" (mouseleave)="onMouseUp()"></canvas>
+    <form class="settings-form">
+        <mat-card>
+            <mat-card-header>Simulation Controls</mat-card-header>
+            <mat-card-actions>
+                <div class="buttons-row">
+                    <button mat-raised-button color="accent" (click)="startSimulation()">Start</button>
+                    <button mat-raised-button color="accent" (click)="stopSimulation()">Pause</button>
+                </div>
+                <mat-form-field appearance="fill">
+                    <mat-label>View Mode</mat-label>
+                    <mat-select [(value)]="viewMode">
+                      <mat-option *ngFor="let mode of viewModes()" [value]="mode">{{ mode }}</mat-option>
+                    </mat-select>
+                </mat-form-field>
+                <div class="buttons-row">
+                    <button mat-raised-button color="primary" (click)="toggleSearchingAnts()">Toggle Searching Ants</button>
+                    <button mat-raised-button color="primary" (click)="toggleFoodCarryingAnts()">Toggle Food-Carrying Ants</button>
+                </div>
+                <div class="buttons-row">
+                    <button mat-raised-button color="accent" (click)="toggleSearchingPheromone()">Toggle Search Pheromone</button>
+                    <button mat-raised-button color="accent" (click)="toggleReturnPheromone()">Toggle Return Pheromone</button>
+                </div>
+            </mat-card-actions>
+        </mat-card>
+    </form>
 </div>
-<canvas #simulationCanvas (mousedown)="onMouseDown($event)" (mousemove)="onMouseMove($event)" (mouseup)="onMouseUp()" (mouseleave)="onMouseUp()"></canvas>
-<br>
-<input type="file" (change)="loadGrid($event)" />
-<button (click)="saveGrid()">Save Grid</button>
+<div class="controls">
+    <form class="settings-form">
+        <mat-card>
+            <mat-card-header>Cell Controlls</mat-card-header>
+            <mat-card-actions>
+                <mat-form-field appearance="fill">
+                    <mat-label>Draw Cell Type</mat-label>
+                    <mat-select [(value)]="selectedCellType">
+                        <mat-option [value]="cellType" *ngFor="let cellType of cellTypes">{{cellType}}</mat-option>
+                    </mat-select>
+                </mat-form-field>
+            
+                <mat-form-field appearance="fill">
+                    <mat-label>Brush Size</mat-label>
+                    <input matInput [(ngModel)]="brushSize" name="brushSize">
+                    <mat-slider min="1" max="5" step="1" [(ngModel)]="brushSize" name="brushSize"></mat-slider>
+                </mat-form-field>
+
+                <mat-form-field appearance="fill">
+                    <mat-label>Select Objects to Remove</mat-label>
+                    <mat-select [formControl]="clearOptions" multiple>
+                      <mat-option *ngFor="let clearSelection of clearOptionsList" [value]="clearSelection">{{clearSelection}}</mat-option>
+                    </mat-select>
+                </mat-form-field>
+
+                <button mat-raised-button color="warn" (click)="clearAllAnts()">Remove Selected Objects</button>
+            </mat-card-actions>
+        </mat-card>
+        <mat-card>
+            <mat-card-header>Organism Controls</mat-card-header>
+            <mat-card-actions>
+                <mat-form-field appearance="fill">
+                    <mat-label>Max Ants</mat-label>
+                    <input matInput [(ngModel)]="maxAnts" name="maxAnts">
+                    <mat-slider min="1" max="500" step="1" [(ngModel)]="maxAnts" name="maxAnts" (change)="onMaxAntsChange($event)"></mat-slider>
+                </mat-form-field>
+                <mat-form-field appearance="fill">
+                    <mat-label>Max Predators</mat-label>
+                    <input matInput [(ngModel)]="maxPredators" name="maxPredators">
+                    <mat-slider min="1" max="100" step="1" [(ngModel)]="maxPredators" name="maxPredators" (change)="onMaxPredatorsChange($event)"></mat-slider>
+                </mat-form-field>
+                <mat-form-field appearance="fill">
+                    <mat-label>Ant Lifespan</mat-label>
+                    <input matInput [(ngModel)]="antLifespan" name="antLifespan">
+                    <mat-slider min="1" max="100" step="1" [(ngModel)]="antLifespan" name="antLifespan" (change)="onAntLifespanChange($event)"></mat-slider>
+                </mat-form-field>
+                <mat-form-field appearance="fill">
+                    <mat-label>Predator Lifespan</mat-label>
+                    <input matInput [(ngModel)]="predatorLifespan" name="predatorLifespan">
+                    <mat-slider min="1" max="100" step="1" [(ngModel)]="predatorLifespan" name="predatorLifespan" (change)="onPredatorLifespanChange($event)"></mat-slider>
+                </mat-form-field>
+                <mat-form-field appearance="fill">
+                    <mat-label>Pheromone decay rate (larger is faster)</mat-label>
+                    <input matInput [(ngModel)]="pheromoneDecayRate" name="pheromoneDecayRate">
+                    <mat-slider min="0.00001" max=".01" step="0.0005" [(ngModel)]="pheromoneDecayRate" name="pheromoneDecayRate" (change)="onPheromoneDecayChange($event)"></mat-slider>
+                </mat-form-field>
+            </mat-card-actions>
+        </mat-card>
+        <mat-card>
+            <mat-card-header>Save and Load</mat-card-header>
+            <mat-card-actions>
+                <div class="file-controls">
+                    <input type="file" (change)="loadGrid($event)" />
+                    <button mat-raised-button color="warn" (click)="saveGrid()">Save Grid</button>
+                </div>
+            </mat-card-actions>
+        </mat-card>
+    </form>
+</div>

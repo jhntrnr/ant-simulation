@@ -1,7 +1,11 @@
 import { Vector2 } from 'three';
+
+import { Cell, CellType, PheromoneType } from './cell.model';
+import { Predator } from './predator.model';
+import { PredatorService } from '../services/predator.service';
 import { GridService } from '../services/grid.service';
 import { limitVector, rotateVector } from '../utils/vector-utils';
-import { Cell, CellType } from './cell.model';
+
 
 export enum AntState {
     FoodSearch,
@@ -13,7 +17,6 @@ export class Ant {
     public y: number;
     public state: AntState;
     public foodCarrying: boolean;
-    public chanceToDie: number;
     public speed: number;
     public maxSpeed: number;
     public maxForce: number;
@@ -28,7 +31,6 @@ export class Ant {
         this.y = y;
         this.state = AntState.FoodSearch;
         this.foodCarrying = false;
-        this.chanceToDie = 0.0005;
         this.speed = 0.05 + (Math.random() - 0.5) * 0.01;
         this.maxSpeed = 0.05 + (Math.random() - 0.5) * 0.01;
         this.maxForce = 2;
@@ -63,49 +65,94 @@ export class Ant {
     }
 
     followPheromones(cells: Cell[]): Vector2 {
-        const desired = new Vector2(0, 0);
+        let desired = new Vector2(0, 0);
     
         if (cells.length === 0) {
             return desired;
         }
+    
         let targetCell: Cell | undefined;
         let highestPheromoneValue = 0;
-        const visionAngle = Math.PI / (this.goalReached ? 0.25 : 3);
-        if(this.goalReached){
+        let visionAngle = Math.PI / (this.goalReached ? 0.5 : 3);
+    
+        if (this.goalReached) {
             this.goalReached = false;
         }
+        const cellWithMaxDistressPheromone = cells.reduce((maxCell, currentCell) => {
+            let currentCellDistress = currentCell.pheromones.get(PheromoneType.DistressPheromone) as number;
+            let maxCellDistress = maxCell.pheromones.get(PheromoneType.DistressPheromone) as number;
+            return currentCellDistress > maxCellDistress ? currentCell : maxCell;
+        });
+
         for (const cell of cells) {
             let pheromoneValue;
             if (this.state === AntState.FoodSearch) {
-                pheromoneValue = cell.returnPheromone;
+                pheromoneValue = cell.pheromones.get(PheromoneType.ReturnPheromone) as Vector2;
             } else if (this.state === AntState.HomeSearch) {
-                pheromoneValue = cell.searchPheromone;
+                pheromoneValue = cell.pheromones.get(PheromoneType.SearchPheromone) as Vector2;
             } else {
                 continue;
             }
+
+            let cellDistressPheromone = cell.pheromones.get(PheromoneType.DistressPheromone) as number;
+
             const cellCenter = new Vector2(cell.x + 0.5, cell.y + 0.5);
             const directionToCell = cellCenter.clone().sub(this.position).normalize();
             const angleToCell = this.velocity.angleTo(directionToCell);
     
-            if (Math.abs(angleToCell) < visionAngle && pheromoneValue.length() > highestPheromoneValue) {
-                highestPheromoneValue = pheromoneValue.length();
+            if (Math.abs(angleToCell) < visionAngle && pheromoneValue.length() - cellDistressPheromone > highestPheromoneValue) {
+                highestPheromoneValue = pheromoneValue.length() - cellDistressPheromone;
                 targetCell = cell;
             }
         }
     
         if (targetCell) {
-            const pheromoneValue = this.state === AntState.FoodSearch
-                ? targetCell.returnPheromone.clone().normalize().negate()
-                : targetCell.searchPheromone.clone().normalize().negate();
-
+            let targetPheromoneValue;
+            let pheromoneValue;
+            if (this.state === AntState.FoodSearch) {
+                targetPheromoneValue = targetCell.pheromones.get(PheromoneType.ReturnPheromone) as Vector2;
+                
+            } else if (this.state === AntState.HomeSearch) {
+                targetPheromoneValue = targetCell.pheromones.get(PheromoneType.SearchPheromone) as Vector2;
+            } else {
+                return desired;
+            }
+            pheromoneValue = targetPheromoneValue.clone().normalize().negate();
             const moveTarget = new Vector2((targetCell.x + (0.5)) + Math.random() - 0.5, (targetCell.y + (0.5)) + Math.random() - 0.5);
             const targetPosition = moveTarget.clone().add(pheromoneValue);
     
             desired.copy(this.moveToward(targetPosition));
         }
+        
+        let maxDistressValue = cellWithMaxDistressPheromone.pheromones.get(PheromoneType.DistressPheromone) as number;
+
+        if (maxDistressValue >= 0.1) {
+            const cellCenter = new Vector2(cellWithMaxDistressPheromone.x + 0.5, cellWithMaxDistressPheromone.y + 0.5);
+            const directionAwayFromDistress = this.position.clone().sub(cellCenter).normalize();
+            desired.add(directionAwayFromDistress.multiplyScalar(maxDistressValue));
+        }
+    
         return desired;
     }
     
+    avoidPredators(predatorService: PredatorService, gridService: GridService, desiredVelocity: Vector2): void{
+        if(Math.random() < 0.95){
+            return;
+        }
+        const avoidRadius = 3;
+        const forceMultiplier = 0.1;
+        const lookaheadDistance = this.maxSpeed;
+        const predictedPosition = this.position.clone().add(desiredVelocity.clone().normalize().multiplyScalar(lookaheadDistance));
+        for (const predator of predatorService.predators) {
+            const distanceToPredator = predictedPosition.distanceTo(predator.position);
+            if (distanceToPredator <= avoidRadius) {
+                let repulsionForce = predictedPosition.clone().sub(predator.position).normalize().multiplyScalar(forceMultiplier);
+                this.layScalarPheromonesByType(gridService, PheromoneType.DistressPheromone, 0.75);
+                repulsionForce = rotateVector(repulsionForce, (Math.random() - 0.5) * 2 * Math.PI * 0.055);
+                this.applyForce(repulsionForce);
+            }
+        }
+    }
 
     avoidObstacles(cells: Cell[], gridService: GridService, desiredVelocity: Vector2): void {
         const avoidRadius = 0.75;
@@ -117,7 +164,7 @@ export class Ant {
                 const cellCenter = new Vector2(cell.x + .5, cell.y + .5);
                 const distanceToCell = predictedPosition.distanceTo(cellCenter);
                 if (distanceToCell <= avoidRadius) {
-                    this.layAvoidPheromones(gridService);
+                    this.layScalarPheromonesByType(gridService, PheromoneType.AvoidPheromone, 0.03);
                     let repulsionForce = predictedPosition.clone().sub(cellCenter).normalize().multiplyScalar(forceMultiplier);
                     repulsionForce = rotateVector(repulsionForce, (Math.random() - 0.5) * 2 * Math.PI * 0.055);
                     this.applyForce(repulsionForce);
@@ -167,7 +214,7 @@ export class Ant {
 
 //#region Pheromones
 
-    layPheromones(gridService: GridService): void {
+    layVectorPheromones(gridService: GridService): void {
         const x = Math.floor(this.position.x);
         const y = Math.floor(this.position.y);
         const cell = gridService.getCell(x, y);
@@ -178,27 +225,35 @@ export class Ant {
 
         if (this.strongPheromoneTime > 0) {
             if (this.state === AntState.FoodSearch) {
-                cell.searchPheromone.add(this.velocity.clone().multiplyScalar(0.02)).clampLength(0,1);
+                let currentCellPheromone = cell.pheromones.get(PheromoneType.SearchPheromone) as Vector2;
+                currentCellPheromone.add(this.velocity.clone().multiplyScalar(0.02)).clampLength(0,1);
             } else {
-                cell.returnPheromone.add(this.velocity.clone().multiplyScalar(0.02)).clampLength(0,1);
+                let currentCellPheromone = cell.pheromones.get(PheromoneType.ReturnPheromone) as Vector2;
+                currentCellPheromone.add(this.velocity.clone().multiplyScalar(0.02)).clampLength(0,1);
             }
             this.strongPheromoneTime -= 1;
         } else {
             if (this.state === AntState.FoodSearch) {
-                cell.searchPheromone.add(this.velocity.clone().multiplyScalar(0.01)).clampLength(0,1);
+                let currentCellPheromone = cell.pheromones.get(PheromoneType.SearchPheromone) as Vector2;
+                currentCellPheromone.add(this.velocity.clone().multiplyScalar(0.01)).clampLength(0,1);
             } else {
-                cell.returnPheromone.add(this.velocity.clone().multiplyScalar(0.01)).clampLength(0,1);
+                let currentCellPheromone = cell.pheromones.get(PheromoneType.ReturnPheromone) as Vector2;
+                currentCellPheromone.add(this.velocity.clone().multiplyScalar(0.01)).clampLength(0,1);
             }
         }
     }
 
-    layAvoidPheromones(gridService: GridService): void {
+    layScalarPheromonesByType(gridService: GridService, pheromoneType: PheromoneType, quantity: number): void {
         const currentCell = gridService.getCellAtPosition(this.position);
         if(currentCell === undefined){
             return;
         }
-        currentCell.avoidPheromone = Math.min(currentCell.avoidPheromone + .03, 1);
+
+        let currentCellPheromone = currentCell.pheromones.get(pheromoneType) as number;
+        currentCellPheromone = Math.min(currentCellPheromone + quantity, 1);
+        currentCell.pheromones.set(pheromoneType, currentCellPheromone);
     }
+
 //#endregion
 
 }

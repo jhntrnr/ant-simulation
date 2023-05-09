@@ -1,10 +1,10 @@
 import { Vector2 } from 'three';
-import { Cell, CellType } from './cell.model';
+import { Cell, CellType, PheromoneType } from './cell.model';
 
 export class Grid {
     private cells: Cell[][];
     cellSize!: number;
-    constructor(public width: number, public height: number, cellSize: number = 10) {
+    constructor(public width: number, public height: number, cellSize: number = 8) {
         this.cellSize = cellSize;
         this.cells = new Array(height).fill(null).map((_, y) =>
             new Array(width).fill(null).map((_, x) => new Cell(x, y, CellType.Blank))
@@ -35,9 +35,38 @@ export class Grid {
     public setAllPheromonesToZero(): void {
         this.cells.forEach((row: Cell[]) => {
             row.forEach((cell: Cell) => {
-                cell.searchPheromone = new Vector2(0,0);
-                cell.returnPheromone = new Vector2(0,0);
-                cell.avoidPheromone = 0;
+                for (const pheromoneType in PheromoneType) {
+                    if (Object.prototype.hasOwnProperty.call(PheromoneType, pheromoneType)) {
+                        const key = PheromoneType[pheromoneType as keyof typeof PheromoneType];
+                        if (typeof(cell.pheromones.get(key)) === 'number') {
+                            cell.pheromones.set(key, 0);
+                        } else {
+                            cell.pheromones.set(key, new Vector2(0, 0));
+                        }
+                    }
+                }                  
+            });
+        });
+    }
+
+    public setAllPheromonesToZeroByType(pheromoneType: PheromoneType): void {
+        this.cells.forEach((row: Cell[]) => {
+            row.forEach((cell: Cell) => {
+                if (typeof(cell.pheromones.get(pheromoneType)) === 'number') {
+                    cell.pheromones.set(pheromoneType, 0);
+                } else {
+                    cell.pheromones.set(pheromoneType, new Vector2(0, 0));
+                }
+            });
+        });
+    }
+
+    public setCellsOfTypeToBlank(cellType: CellType): void {
+        this.cells.forEach((row: Cell[]) => {
+            row.forEach((cell: Cell) => {
+                if(cell.type === cellType){
+                    cell.type = CellType.Blank;
+                }
             });
         });
     }

@@ -1,8 +1,11 @@
 import { Component, ElementRef, ViewChild, OnInit, OnDestroy, AfterViewInit } from '@angular/core';
+import { FormGroup, FormControl } from '@angular/forms';
 import { Vector2 } from 'three';
-import { CellType } from '../../models/cell.model';
+
+import { CellType, PheromoneType } from '../../models/cell.model';
 import { GridService } from '../../services/grid.service';
 import { AntService } from '../../services/ant.service';
+import { PredatorService } from '../../services/predator.service';
 import { FoodService } from '../../services/food.service';
 
 enum ViewMode {
@@ -21,17 +24,23 @@ export class AntSimulationComponent implements OnInit, AfterViewInit {
     selectedCellType: CellType = CellType.Obstacle;
     cellTypes = Object.values(CellType).filter(v => typeof v === 'string');
     pheromoneDecayRate: number = 0.0015;
+    maxAnts: number = 50;
+    maxPredators: number = 6;
+    predatorLifespan: number = 50;
+    antLifespan: number = 50;
     brushSize: number = 1;
     showingSearchingAnts: boolean = true;
     showingFoodCarryingAnts: boolean = true;
     showingSearchPheromone: boolean = true;
     showingReturnPheromone: boolean = true;
     viewMode: ViewMode = ViewMode.PaintedPheromones;
+    clearOptions = new FormControl();
+    clearOptionsList: string[] = ['Ants', 'Search Pheromones', 'Return Pheromones', 'Distress Pheromones', 'Predators', 'Ant Spawn Cells', 'Predator Spawn Cells', 'Food Cells', 'Obstacle Cells', 'Everything'];
     private isDrawing: boolean = false;
     private running: boolean = true;
     private context!: CanvasRenderingContext2D;
     private cellSize!: number;
-    constructor(private gridService: GridService, private antService: AntService, private foodService: FoodService) {}
+    constructor(private gridService: GridService, private antService: AntService, private predatorService: PredatorService, private foodService: FoodService) {}
 
     async ngOnInit(): Promise<void> {
         try {
@@ -40,6 +49,7 @@ export class AntSimulationComponent implements OnInit, AfterViewInit {
             console.error('Error loading default grid:', err);
         }
         this.cellSize = this.gridService.grid.cellSize;
+        this.antService.maxAnts = this.maxAnts;
     }
 
     async ngAfterViewInit(): Promise<void> {
@@ -54,11 +64,54 @@ export class AntSimulationComponent implements OnInit, AfterViewInit {
         
         requestAnimationFrame(() => this.draw());
     }
-      
 
     onPheromoneDecayChange(event: any): void {
-        this.pheromoneDecayRate = event.target.value;
+        this.pheromoneDecayRate = event.value;
         this.gridService.pheromoneDecayRate = this.pheromoneDecayRate;
+    }
+
+    onMaxAntsChange(event: any): void {
+        this.maxAnts = event.value;
+        this.antService.maxAnts = this.maxAnts;
+    }
+
+    onMaxPredatorsChange(event: any): void {
+        this.maxPredators = event.value;
+        this.predatorService.maxPredators = this.maxPredators;
+    }
+
+    onAntLifespanChange(event: any): void {
+        this.antLifespan = event.value;
+
+        const minValue = 0.01;
+        const maxValue = 0;
+        const middleValue = 0.0005;
+        const middleSliderValue = 50;
+      
+        if (this.antLifespan === middleSliderValue) {
+            this.antService.antLifespan = middleValue;
+        } else if (this.antLifespan <= middleSliderValue) {
+            this.antService.antLifespan = minValue + ((middleValue - minValue) / (middleSliderValue - 1)) * (this.antLifespan - 1);
+        } else {
+            this.antService.antLifespan = middleValue + ((maxValue - middleValue) / (100 - middleSliderValue)) * (this.antLifespan - middleSliderValue);
+        }
+    }
+
+    onPredatorLifespanChange(event: any): void {
+        this.predatorLifespan = event.value;
+
+        const minValue = 0.1;
+        const maxValue = 0;
+        const middleValue = 0.005;
+        const middleSliderValue = 50;
+      
+        if (this.predatorLifespan === middleSliderValue) {
+            this.predatorService.predatorLifespan = middleValue;
+        } else if (this.predatorLifespan <= middleSliderValue) {
+            this.predatorService.predatorLifespan = minValue + ((middleValue - minValue) / (middleSliderValue - 1)) * (this.predatorLifespan - 1);
+        } else {
+            this.predatorService.predatorLifespan = middleValue + ((maxValue - middleValue) / (100 - middleSliderValue)) * (this.predatorLifespan - middleSliderValue);
+        }
     }
 
     startSimulation(): void {
@@ -79,9 +132,11 @@ export class AntSimulationComponent implements OnInit, AfterViewInit {
         this.context.clearRect(0, 0, this.canvas.nativeElement.width, this.canvas.nativeElement.height);
         this.drawGrid();
         this.drawAnts();
+        this.drawPredators();
         if (this.running){
-            this.antService.updateAnts();
-            this.gridService.updateGrid(this.antService);
+            this.antService.updateAnts(this.predatorService);
+            this.predatorService.updatePredators();
+            this.gridService.updateGrid(this.antService, this.predatorService);
         }
 
         requestAnimationFrame(() => this.draw());
@@ -106,14 +161,19 @@ export class AntSimulationComponent implements OnInit, AfterViewInit {
             for (let x = 0; x < this.gridService.width; x++) {
                 const cell = this.gridService.getCell(x, y);
                 if(cell !== undefined){
-                    const red = this.showingSearchPheromone ? this.clampColorValue(1 - cell.searchPheromone.length()) : 255;
-                    const blue = this.showingReturnPheromone ? this.clampColorValue(1 - cell.returnPheromone.length()) : 255;
-                    const green = this.clampColorValue(1 - cell.avoidPheromone);
+                    let searchPheromone = cell.pheromones.get(PheromoneType.SearchPheromone) as Vector2;
+                    let returnPheromone = cell.pheromones.get(PheromoneType.ReturnPheromone) as Vector2;
+                    let distressPheromone = cell.pheromones.get(PheromoneType.DistressPheromone) as number;
+                    const red = this.showingSearchPheromone ? this.clampColorValue(1 - searchPheromone.length()) : 255;
+                    const blue = this.showingReturnPheromone ? this.clampColorValue(1 - returnPheromone.length()) : 255;
+                    const green = this.clampColorValue(1 - distressPheromone);
                     let cellColor = `rgba(${red}, ${green}, ${blue}, 1)`;
                     if (cell.type === CellType.AntSpawn) {
-                        cellColor = 'darkred';
+                        cellColor = 'cadetblue';
+                    } else if (cell.type === CellType.PredatorSpawn) {
+                        cellColor = 'orange';
                     } else if (cell.type === CellType.FoodSpawn) {
-                        cellColor = 'green';
+                        cellColor = 'limegreen';
                     } else if (cell.type === CellType.Obstacle) {
                         cellColor = 'darkgray';
                     }
@@ -137,20 +197,24 @@ export class AntSimulationComponent implements OnInit, AfterViewInit {
                     const centerX = x * this.cellSize + this.cellSize / 2;
                     const centerY = y * this.cellSize + this.cellSize / 2;
                     if(this.showingSearchPheromone){
+                        let searchPheromone = cell.pheromones.get(PheromoneType.SearchPheromone) as Vector2;
                         this.context.strokeStyle = 'darkblue';
-                        this.drawArrow(centerX, centerY, cell.searchPheromone, arrowSize);
+                        this.drawArrow(centerX, centerY, searchPheromone, arrowSize);
                     }
                     if(this.showingReturnPheromone){
+                        let returnPheromone = cell.pheromones.get(PheromoneType.ReturnPheromone) as Vector2;
                         this.context.strokeStyle = 'darkred';
-                        this.drawArrow(centerX, centerY, cell.returnPheromone, arrowSize);
+                        this.drawArrow(centerX, centerY, returnPheromone, arrowSize);
                     }
                 }
                 else{
-                    if (cell?.type === CellType.AntSpawn) {
-                        cellColor = 'darkred';
-                    } else if (cell?.type === CellType.FoodSpawn) {
-                        cellColor = 'green';
-                    } else if (cell?.type === CellType.Obstacle) {
+                    if (cell.type === CellType.AntSpawn) {
+                        cellColor = 'cadetblue';
+                    } else if (cell.type === CellType.PredatorSpawn) {
+                        cellColor = 'orange';
+                    } else if (cell.type === CellType.FoodSpawn) {
+                        cellColor = 'limegreen';
+                    } else if (cell.type === CellType.Obstacle) {
                         cellColor = 'darkgray';
                     }
                     this.context.fillStyle = cellColor;
@@ -196,9 +260,11 @@ export class AntSimulationComponent implements OnInit, AfterViewInit {
                 if(cell !== undefined){
                     let cellColor = 'white';
                     if (cell.type === CellType.AntSpawn) {
-                        cellColor = 'darkred';
+                        cellColor = 'cadetblue';
+                    } else if (cell.type === CellType.PredatorSpawn) {
+                        cellColor = 'orange';
                     } else if (cell.type === CellType.FoodSpawn) {
-                        cellColor = 'green';
+                        cellColor = 'limegreen';
                     } else if (cell.type === CellType.Obstacle) {
                         cellColor = 'darkgray';
                     }
@@ -221,7 +287,8 @@ export class AntSimulationComponent implements OnInit, AfterViewInit {
             if(!this.showingSearchingAnts && !ant.foodCarrying){
                 return;
             }
-            this.context.fillStyle = ant.foodCarrying  ? 'red' : 'black';
+            this.context.fillStyle = ant.foodCarrying  ? 'goldenrod' : 'black';
+            this.context.strokeStyle = 'black';
             const x = ant.position.x * this.cellSize;
             const y = ant.position.y * this.cellSize;
             const radius = this.cellSize / 4;
@@ -229,12 +296,65 @@ export class AntSimulationComponent implements OnInit, AfterViewInit {
             this.context.beginPath();
             this.context.arc(x, y, radius, 0, Math.PI * 2);
             this.context.fill();
+            this.context.stroke();
+        });
+    }
+
+    private drawPredators(): void {
+        this.predatorService.predators.forEach(predator => {
+            if(!this.showingFoodCarryingAnts && predator.foodCarrying){
+                return;
+            }
+            if(!this.showingSearchingAnts && !predator.foodCarrying){
+                return;
+            }
+            this.context.fillStyle = predator.foodCarrying  ? 'darkred' : 'red';
+            this.context.strokeStyle = 'black';
+            const x = predator.position.x * this.cellSize;
+            const y = predator.position.y * this.cellSize;
+            const radius = this.cellSize / 4;
+
+            this.context.beginPath();
+            this.context.arc(x, y, radius, 0, Math.PI * 2);
+            this.context.fill();
+            this.context.stroke();
         });
     }
 
     clearAllAnts(): void {
-        this.gridService.clearAllPheromones();
-        this.antService.killAllAnts();
+        if(this.clearOptions.value === null || this.clearOptions.value.length < 1){
+            return;
+        }
+        if(this.clearOptions.value.includes('Ants') || this.clearOptions.value.includes('Everything')){
+            this.antService.killAllAnts();
+        }
+        if(this.clearOptions.value.includes('Search Pheromones') || this.clearOptions.value.includes('Everything')){
+            this.gridService.clearPheromonesByType(PheromoneType.SearchPheromone);
+        }
+        if(this.clearOptions.value.includes('Return Pheromones') || this.clearOptions.value.includes('Everything')){
+            this.gridService.clearPheromonesByType(PheromoneType.ReturnPheromone);
+        }
+        if(this.clearOptions.value.includes('Distress Pheromones') || this.clearOptions.value.includes('Everything')){
+            this.gridService.clearPheromonesByType(PheromoneType.DistressPheromone);
+        }
+        if(this.clearOptions.value.includes('Predators') || this.clearOptions.value.includes('Everything')){
+            this.predatorService.killAllPredators();
+        }
+        if(this.clearOptions.value.includes('Ant Spawn Cells') || this.clearOptions.value.includes('Everything')){
+            this.gridService.clearAllCellsOfType(CellType.AntSpawn);
+        }
+        if(this.clearOptions.value.includes('Predator Spawn Cells') || this.clearOptions.value.includes('Everything')){
+            this.gridService.clearAllCellsOfType(CellType.PredatorSpawn);
+        }
+        if(this.clearOptions.value.includes('Food Cells') || this.clearOptions.value.includes('Everything')){
+            this.gridService.clearAllCellsOfType(CellType.FoodSpawn);
+        }
+        if(this.clearOptions.value.includes('Obstacle Cells') || this.clearOptions.value.includes('Everything')){
+            this.gridService.clearAllCellsOfType(CellType.Obstacle);
+        }
+        if(this.clearOptions.value.includes('Everything')){
+            this.gridService.clearPheromonesByType(PheromoneType.AvoidPheromone);
+        }
     }
 
     toggleSearchingAnts(): void {
@@ -274,15 +394,16 @@ export class AntSimulationComponent implements OnInit, AfterViewInit {
     
         const cellX = Math.floor(x / this.cellSize);
         const cellY = Math.floor(y / this.cellSize);
-        if(this.selectedCellType === CellType.AntSpawn || this.selectedCellType === CellType.FoodSpawn){
+        if(this.selectedCellType === CellType.AntSpawn || this.selectedCellType === CellType.FoodSpawn || this.selectedCellType === CellType.PredatorSpawn){
             this.brushSize = 1;
         }
-        for (let i = -Math.floor(this.brushSize / 2); i <= Math.floor(this.brushSize / 2); i++) {
-            for (let j = -Math.floor(this.brushSize / 2); j <= Math.floor(this.brushSize / 2); j++) {
+        const halfBrushSize = Math.floor(this.brushSize / 2);
+        for (let i = -halfBrushSize; i < -halfBrushSize + this.brushSize; i++) {
+            for (let j = -halfBrushSize; j < -halfBrushSize + this.brushSize; j++) {
                 this.gridService.setCellType(cellX + i, cellY + j, this.selectedCellType);
             }
         }
-    }
+    }    
 
     saveGrid(): void {
         const filename = 'ant_grid';

@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { Vector2 } from 'three';
 import { Ant, AntState } from '../models/ant.model';
-import { FoodService } from './food.service';
+import { PredatorService } from './predator.service';
 import { GridService } from './grid.service';
 import { CellType } from '../models/cell.model';
 
@@ -11,7 +11,9 @@ import { CellType } from '../models/cell.model';
 
 export class AntService {
     ants: Ant[] = [];
-    maxAnts: number = 400;
+    maxAnts: number = 1;
+    antVisionRange: number = 3;
+    antLifespan: number = 0.0005;
     constructor(private gridService: GridService) {}
 
     public createAnt(x: number, y: number): void {
@@ -22,8 +24,8 @@ export class AntService {
         this.ants.push(ant);
     }
 
-    public updateAnts(): void {
-        this.moveAnts(this.gridService);
+    public updateAnts(predatorService: PredatorService): void {
+        this.moveAnts(predatorService,this.gridService);
     }
 
     public getAnts(): Ant[] {
@@ -34,22 +36,41 @@ export class AntService {
         this.ants = [];
     }
 
-    public moveAnts(gridService: GridService): void {
-        const visionRange = 3;
+    public killSpecificAnt(deadAnt: Ant, gridService: GridService, layDistressPheromones: boolean = false): void {
+        const index = this.ants.indexOf(deadAnt, 0);
+        if (index > -1) {
+            this.ants.splice(index, 1);
+        }
+    }
+
+    public getAntsInRange(predatorPosition: Vector2, visionRange: number) : Ant[] {
+        let antsInRange: Ant[] = [];
+        for (const ant of this.ants) {
+            if(ant.position.distanceTo(predatorPosition) < visionRange){
+                antsInRange.push(ant);
+            }
+        }
+        return antsInRange;
+    }
+
+    public moveAnts(predatorService: PredatorService, gridService: GridService): void {
+        this.antVisionRange = 3;
         const grabRange = 1;
         const cellSize = gridService.grid.cellSize;
         let antsDying: Ant[] = [];
         for (const ant of this.ants) {
-            if(Math.random() < ant.chanceToDie){
+            if(Math.random() < this.antLifespan){
                 antsDying.push(ant);
                 continue;
             }
             let desiredVelocity = new Vector2(0, 0);
-            const nearbyCellsLineOfSight = gridService.getCellsInRangeLineOfSight(ant.position, visionRange);
-            const nearbyCellsAll = gridService.getCellsInRange(ant.position, visionRange);
+            const nearbyCellsLineOfSight = gridService.getCellsInRangeLineOfSight(ant.position, this.antVisionRange, true)
+                .sort((a, b) => ant.position.distanceTo(a.position) - ant.position.distanceTo(b.position));
+            const nearbyCellsAll = gridService.getCellsInRange(ant.position, this.antVisionRange)
+                .sort((a, b) => ant.position.distanceTo(a.position) - ant.position.distanceTo(b.position));
             if (ant.state === AntState.FoodSearch && nearbyCellsLineOfSight.length > 0) {
                 const foodCell = nearbyCellsLineOfSight.find(cell => cell.type === CellType.FoodSpawn);
-                if(foodCell !== undefined && ant.position.distanceTo(foodCell.position) <= visionRange * cellSize) {
+                if(foodCell !== undefined && ant.position.distanceTo(foodCell.position) <= this.antVisionRange * cellSize) {
                     if(ant.position.distanceTo(foodCell.position.clone().add(new Vector2(0.5,0.5))) < grabRange){
                         ant.setFoodCarrying(true);
                     }
@@ -73,16 +94,14 @@ export class AntService {
                 desiredVelocity = ant.followPheromones(nearbyCellsLineOfSight);
             }
             ant.avoidObstacles(nearbyCellsAll,gridService, desiredVelocity);
+            ant.avoidPredators(predatorService,gridService,desiredVelocity);
             ant.stayInBounds(gridService.width, gridService.height);
             ant.applyRandomSteering();
-            ant.layPheromones(gridService);
+            ant.layVectorPheromones(gridService);
         }
 
         antsDying.forEach((deadAnt) => {
-            const index = this.ants.indexOf(deadAnt, 0);
-            if (index > -1) {
-                this.ants.splice(index, 1);
-            }
+            this.killSpecificAnt(deadAnt, gridService);
         });
     }
 }
