@@ -11,22 +11,26 @@ TL;DR - Ants want to find food, then bring the food back home. Depending on thei
 - Ants are colored black when searching for food, and red when carrying food.
 - Ants have two states: `FoodSearch` and `HomeSearch`.
 - While in `FoodSearch` mode, ants lay down `searchPheromone` in their current cell and try to follow `returnPheromone` trails.
-  - `searchPheromone` concentration is represented in the red color channel of a cell.
-    - Cells with no `searchPheromone` have a red value of 255; cells saturated have a red value of 0.
 - While in `HomeSearch` mode, ants lay down `returnPheromone` in their current cell and try to follow `searchPheromone` trails.
-  - `returnPheromone` concentration is represented in the blue color channel of a cell.
-    - Cells with no `returnPheromone` have a blue value of 255; saturated cells have a blue value of 0.
+### Pheromones
+- Some pheromones are scalars, others are Vector2s.
+  - `searchPheromone` and `returnPheromone` are Vector2s.
+  - `avoidPheromone` and `distressPheromone` are scalars.
+- Ants that are following a Vector2 pheromone trail follow it in reverse.
+- Vector2 pheromones form a vector field that spans the grid of cells.
+  - The vector field can be viewed in the simulation controls.
 ### Ant Movement and Collisions
-- Ants move towards cells with the highest concentration of the opposite pheromone in their field of view.
+- Ants move based on the vector field of pheromones.
 - Ants that don't see any of the opposite pheromone wander randomly.
 - Ants use a simple raycast (Bresenham's Line Algorithm) to determine line of sight.
 - Ants collide with the edges of the canvas and with gray `Obstacle` cells.
 - Obstacle cells block line of sight.
 - Collisions cause ants to lay down `avoidPheromone` in their current cell.
-  - `avoidPheromone` concentration is represented in the green color channel of a cell.
-    - Cells with no `avoidPheromone` have a green value of 255; saturated cells have a green value of 0.
-- Ants ignore cells with a concentration of `avoidPheromone` over a threshold, currently 25% saturation.
+- Ants ignore cells with a concentration of `avoidPheromone` over a threshold.
 - Ant field of view for purposes of following pheromone trails is 60 degrees.
+- Ants avoid `Predators` some of the time.
+- Ants that see a Predator or that see another ant fall prey to a predator lay down `distressPheromone`.
+- `distressPheromone` works similarly to `avoidPheromone`, causing ants to want to steer away.
 ### Ant Lifespans
 - Ants continually spawn until a threshold of live ants is reached.
 - Ants have a limited lifespan, represented by a small chance to die each frame.
