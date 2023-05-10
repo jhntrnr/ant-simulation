@@ -41,7 +41,7 @@ export class PredatorService {
         const cellSize = gridService.grid.cellSize;
         let predatorsDying: Predator[] = [];
         for (const predator of this.predators) {
-            if(Math.random() < this.predatorLifespan){
+            if(Math.random() < this.predatorLifespan || predator.isSuffocating(gridService)){
                 predatorsDying.push(predator);
                 continue;
             }

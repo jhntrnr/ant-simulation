@@ -8,6 +8,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatInputModule } from '@angular/material/input';
 import { MatSliderModule } from '@angular/material/slider';
 import { MatCardModule } from '@angular/material/card';
+import {MatDividerModule} from '@angular/material/divider';
 
 import { AppComponent } from './app.component';
 import { AntSimulationComponent } from './ant-simulation/components/ant-simulation/ant-simulation.component';
@@ -30,6 +31,7 @@ import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
         MatInputModule,
         MatSliderModule,
         MatCardModule,
+        MatDividerModule,
     ],
     providers: [],
     bootstrap: [AppComponent]

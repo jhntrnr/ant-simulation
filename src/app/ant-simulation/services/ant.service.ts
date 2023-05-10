@@ -59,7 +59,7 @@ export class AntService {
         const cellSize = gridService.grid.cellSize;
         let antsDying: Ant[] = [];
         for (const ant of this.ants) {
-            if(Math.random() < this.antLifespan){
+            if(Math.random() < this.antLifespan || ant.isSuffocating(gridService)){
                 antsDying.push(ant);
                 continue;
             }

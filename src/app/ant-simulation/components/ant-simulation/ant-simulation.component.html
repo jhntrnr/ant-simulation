@@ -1,5 +1,10 @@
+<div class="tooltip" [ngStyle]="tooltipStyle">
+    <p>{{cellType}}</p>
+    <p *ngFor="let pheromone of pheromoneInfo">{{pheromone}}</p>
+</div>
+
 <div class="simulation">
-    <canvas #simulationCanvas (mousedown)="onMouseDown($event)" (mousemove)="onMouseMove($event)" (mouseup)="onMouseUp()" (mouseleave)="onMouseUp()"></canvas>
+    <canvas #simulationCanvas (mousedown)="onMouseDown($event)" (mousemove)="onMouseMove($event)" (mouseup)="onMouseUp()" (mouseleave)="onMouseLeave()"></canvas>
     <form class="settings-form">
         <mat-card>
             <mat-card-header>Simulation Controls</mat-card-header>
@@ -15,12 +20,14 @@
                     </mat-select>
                 </mat-form-field>
                 <div class="buttons-row">
-                    <button mat-raised-button color="primary" (click)="toggleSearchingAnts()">Toggle Searching Ants</button>
-                    <button mat-raised-button color="primary" (click)="toggleFoodCarryingAnts()">Toggle Food-Carrying Ants</button>
+                    <button mat-raised-button color="primary" (click)="toggleSearchingAnts($event)">Hide Searching Ants</button>
+                    <button mat-raised-button color="primary" (click)="toggleFoodCarryingAnts($event)">Hide Food-Carrying Ants</button>
+                    <button mat-raised-button color="primary" (click)="togglePredators($event)">Hide Predators</button>
                 </div>
                 <div class="buttons-row">
-                    <button mat-raised-button color="accent" (click)="toggleSearchingPheromone()">Toggle Search Pheromone</button>
-                    <button mat-raised-button color="accent" (click)="toggleReturnPheromone()">Toggle Return Pheromone</button>
+                    <button mat-raised-button color="accent" (click)="toggleSearchPheromone($event)">Hide Search Pheromone</button>
+                    <button mat-raised-button color="accent" (click)="toggleReturnPheromone($event)">Hide Return Pheromone</button>
+                    <button mat-raised-button color="accent" (click)="toggleDistressPheromone($event)">Hide Distress Pheromone</button>
                 </div>
             </mat-card-actions>
         </mat-card>
@@ -32,16 +39,29 @@
             <mat-card-header>Cell Controlls</mat-card-header>
             <mat-card-actions>
                 <mat-form-field appearance="fill">
-                    <mat-label>Draw Cell Type</mat-label>
+                    <mat-label>Brush Size</mat-label>
+                    <input matInput [(ngModel)]="brushSize" name="brushSize">
+                    <mat-slider min="1" max="5" step="1" [(ngModel)]="brushSize" name="brushSize"></mat-slider>
+                </mat-form-field>
+
+                <mat-form-field appearance="fill">
+                    <mat-label>Draw Cell Type (left click to draw cells)</mat-label>
                     <mat-select [(value)]="selectedCellType">
                         <mat-option [value]="cellType" *ngFor="let cellType of cellTypes">{{cellType}}</mat-option>
                     </mat-select>
                 </mat-form-field>
-            
+                
                 <mat-form-field appearance="fill">
-                    <mat-label>Brush Size</mat-label>
-                    <input matInput [(ngModel)]="brushSize" name="brushSize">
-                    <mat-slider min="1" max="5" step="1" [(ngModel)]="brushSize" name="brushSize"></mat-slider>
+                    <mat-label>Paint Pheromone Type (right click to paint pheromones)</mat-label>
+                    <mat-select [(value)]="selectedPheromoneType">
+                        <mat-option [value]="pheromoneType" *ngFor="let pheromoneType of pheromoneTypes">{{pheromoneType}}</mat-option>
+                    </mat-select>
+                </mat-form-field>
+
+                <mat-form-field appearance="fill">
+                    <mat-label>Pheromone Painting Strength</mat-label>
+                    <input matInput [(ngModel)]="amountOfPheromoneToPaint" name="amountOfPheromoneToPaint">
+                    <mat-slider min="0.001" max="1" step=".001" [(ngModel)]="amountOfPheromoneToPaint" name="amountOfPheromoneToPaint"></mat-slider>
                 </mat-form-field>
 
                 <mat-form-field appearance="fill">
@@ -78,9 +98,19 @@
                     <mat-slider min="1" max="100" step="1" [(ngModel)]="predatorLifespan" name="predatorLifespan" (change)="onPredatorLifespanChange($event)"></mat-slider>
                 </mat-form-field>
                 <mat-form-field appearance="fill">
-                    <mat-label>Pheromone decay rate (larger is faster)</mat-label>
+                    <mat-label>Pheromone Evaporation Amount</mat-label>
                     <input matInput [(ngModel)]="pheromoneDecayRate" name="pheromoneDecayRate">
                     <mat-slider min="0.00001" max=".01" step="0.0005" [(ngModel)]="pheromoneDecayRate" name="pheromoneDecayRate" (change)="onPheromoneDecayChange($event)"></mat-slider>
+                </mat-form-field>
+                <mat-form-field appearance="fill">
+                    <mat-label>Pheromone Diffusion Rate (larger is slower)</mat-label>
+                    <input matInput [(ngModel)]="pheromoneDiffusionRate" name="pheromoneDiffusionRate">
+                    <mat-slider min="0.001" max="10" step="0.001" [(ngModel)]="pheromoneDiffusionRate" name="pheromoneDiffusionRate" (change)="onPheromoneDiffusionRateChange($event)"></mat-slider>
+                </mat-form-field>
+                <mat-form-field appearance="fill">
+                    <mat-label>Pheromone Diffusion Amount</mat-label>
+                    <input matInput [(ngModel)]="pheromoneDiffusionAmount" name="pheromoneDiffusionAmount">
+                    <mat-slider min="0.00001" max=".1" step="0.0005" [(ngModel)]="pheromoneDiffusionAmount" name="pheromoneDiffusionAmount" (change)="onPheromoneDiffusionAmountChange($event)"></mat-slider>
                 </mat-form-field>
             </mat-card-actions>
         </mat-card>

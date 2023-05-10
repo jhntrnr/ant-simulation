@@ -2,7 +2,7 @@ import { Component, ElementRef, ViewChild, OnInit, OnDestroy, AfterViewInit } fr
 import { FormGroup, FormControl } from '@angular/forms';
 import { Vector2 } from 'three';
 
-import { CellType, PheromoneType } from '../../models/cell.model';
+import { Cell, CellType, PheromoneType } from '../../models/cell.model';
 import { GridService } from '../../services/grid.service';
 import { AntService } from '../../services/ant.service';
 import { PredatorService } from '../../services/predator.service';
@@ -23,7 +23,13 @@ export class AntSimulationComponent implements OnInit, AfterViewInit {
     @ViewChild('simulationCanvas', { static: false }) canvas!: ElementRef<HTMLCanvasElement>;
     selectedCellType: CellType = CellType.Obstacle;
     cellTypes = Object.values(CellType).filter(v => typeof v === 'string');
+    selectedPheromoneType: PheromoneType = PheromoneType.SearchPheromone;
+    pheromoneTypes = Object.values(PheromoneType).filter(v => typeof v === 'string');
+    amountOfPheromoneToPaint: number = 0.1;
+    previousMousePosition!: Vector2;
     pheromoneDecayRate: number = 0.0015;
+    pheromoneDiffusionRate: number = 0.3;
+    pheromoneDiffusionAmount: number = 0.01;
     maxAnts: number = 50;
     maxPredators: number = 6;
     predatorLifespan: number = 50;
@@ -31,9 +37,15 @@ export class AntSimulationComponent implements OnInit, AfterViewInit {
     brushSize: number = 1;
     showingSearchingAnts: boolean = true;
     showingFoodCarryingAnts: boolean = true;
+    showingPredators: boolean = true;
     showingSearchPheromone: boolean = true;
     showingReturnPheromone: boolean = true;
+    showingDistressPheromone: boolean = true;
     viewMode: ViewMode = ViewMode.PaintedPheromones;
+    tooltipCell!: Cell | null;
+    tooltipStyle = {};
+    cellType = '';
+    pheromoneInfo: string[] = [];
     clearOptions = new FormControl();
     clearOptionsList: string[] = ['Ants', 'Search Pheromones', 'Return Pheromones', 'Distress Pheromones', 'Predators', 'Ant Spawn Cells', 'Predator Spawn Cells', 'Food Cells', 'Obstacle Cells', 'Everything'];
     private isDrawing: boolean = false;
@@ -68,6 +80,16 @@ export class AntSimulationComponent implements OnInit, AfterViewInit {
     onPheromoneDecayChange(event: any): void {
         this.pheromoneDecayRate = event.value;
         this.gridService.pheromoneDecayRate = this.pheromoneDecayRate;
+    }
+
+    onPheromoneDiffusionRateChange(event: any): void {
+        this.pheromoneDiffusionRate = event.value;
+        this.gridService.pheromonediffusionInterval = this.pheromoneDiffusionRate * 1000;
+    }
+
+    onPheromoneDiffusionAmountChange(event: any): void {
+        this.pheromoneDiffusionAmount = event.value;
+        this.gridService.pheromoneDiffusionAmount = this.pheromoneDiffusionAmount;
     }
 
     onMaxAntsChange(event: any): void {
@@ -133,6 +155,7 @@ export class AntSimulationComponent implements OnInit, AfterViewInit {
         this.drawGrid();
         this.drawAnts();
         this.drawPredators();
+        this.updateTooltip();
         if (this.running){
             this.antService.updateAnts(this.predatorService);
             this.predatorService.updatePredators();
@@ -166,7 +189,7 @@ export class AntSimulationComponent implements OnInit, AfterViewInit {
                     let distressPheromone = cell.pheromones.get(PheromoneType.DistressPheromone) as number;
                     const red = this.showingSearchPheromone ? this.clampColorValue(1 - searchPheromone.length()) : 255;
                     const blue = this.showingReturnPheromone ? this.clampColorValue(1 - returnPheromone.length()) : 255;
-                    const green = this.clampColorValue(1 - distressPheromone);
+                    const green = this.showingDistressPheromone ? this.clampColorValue(1 - distressPheromone) : 255;
                     let cellColor = `rgba(${red}, ${green}, ${blue}, 1)`;
                     if (cell.type === CellType.AntSpawn) {
                         cellColor = 'cadetblue';
@@ -274,7 +297,7 @@ export class AntSimulationComponent implements OnInit, AfterViewInit {
             }
         }
     }
-    
+
     clampColorValue(value: number, min: number = 0, max: number = 255): number {
         return Math.min(Math.max(value * 255, min * 255), max);
     }
@@ -302,10 +325,7 @@ export class AntSimulationComponent implements OnInit, AfterViewInit {
 
     private drawPredators(): void {
         this.predatorService.predators.forEach(predator => {
-            if(!this.showingFoodCarryingAnts && predator.foodCarrying){
-                return;
-            }
-            if(!this.showingSearchingAnts && !predator.foodCarrying){
+            if(!this.showingPredators){
                 return;
             }
             this.context.fillStyle = predator.foodCarrying  ? 'darkred' : 'red';
@@ -357,34 +377,114 @@ export class AntSimulationComponent implements OnInit, AfterViewInit {
         }
     }
 
-    toggleSearchingAnts(): void {
-        this.showingSearchingAnts = !this.showingSearchingAnts;
+    toggleSearchingAnts(event: MouseEvent): void {
+        if(event.target instanceof Element){
+            this.showingSearchingAnts = !this.showingSearchingAnts;
+            event.target.textContent = this.showingSearchingAnts ? "Hide Searching Ants" : "Show Searching Ants";
+        }
     }
 
-    toggleFoodCarryingAnts(): void {
-        this.showingFoodCarryingAnts = !this.showingFoodCarryingAnts;
+    toggleFoodCarryingAnts(event: MouseEvent): void {
+        if(event.target instanceof Element){
+            this.showingFoodCarryingAnts = !this.showingFoodCarryingAnts;
+            event.target.textContent = this.showingFoodCarryingAnts ? "Hide Returning Ants" : "Show Returning Ants";
+        }
     }
 
-    toggleSearchingPheromone(): void {
-        this.showingSearchPheromone = !this.showingSearchPheromone;
+    togglePredators(event: MouseEvent): void {
+        if(event.target instanceof Element){
+            this.showingPredators = !this.showingPredators;
+            event.target.textContent = this.showingPredators ? "Hide Predators" : "Show Predators";
+        }
     }
 
-    toggleReturnPheromone(): void {
-        this.showingReturnPheromone = !this.showingReturnPheromone;
+    toggleSearchPheromone(event: MouseEvent): void {
+        if(event.target instanceof Element){
+            this.showingSearchPheromone = !this.showingSearchPheromone;
+            event.target.textContent = this.showingSearchPheromone ? "Hide Search Pheromone" : "Show Search Pheromone";
+        }
+    }
+
+    toggleReturnPheromone(event: MouseEvent): void {
+        if(event.target instanceof Element){
+            this.showingReturnPheromone = !this.showingReturnPheromone;
+            event.target.textContent = this.showingReturnPheromone ? "Hide Return Pheromone" : "Show Return Pheromone";
+        }
+    }
+
+    toggleDistressPheromone(event: MouseEvent): void {
+        if(event.target instanceof Element){
+            this.showingDistressPheromone = !this.showingDistressPheromone;
+            event.target.textContent = this.showingDistressPheromone ? "Hide Distress Pheromone" : "Show Distress Pheromone";
+        }
     }
 
     onMouseDown(event: MouseEvent): void {
         this.isDrawing = true;
-        this.paintCell(event.clientX, event.clientY);
+        if(event.shiftKey){
+            this.previousMousePosition = new Vector2(event.clientX, event.clientY);
+            this.paintPheromones(event.clientX, event.clientY);
+        }
+        else{
+            this.paintCell(event.clientX, event.clientY);
+        }
     }
 
     onMouseMove(event: MouseEvent): void {
+        const rect = this.canvas.nativeElement.getBoundingClientRect();
+        const x = Math.floor((event.clientX - rect.left) / this.cellSize);
+        const y = Math.floor((event.clientY - rect.top) / this.cellSize);
+        const cell = this.gridService.getCell(x, y);
+        if(cell){
+            this.tooltipCell = cell;
+            this.tooltipStyle = {
+                display: 'block',
+                left: `${event.clientX + 15}px`,
+                top: `${event.clientY + 10}px`
+            };
+        }
         if (!this.isDrawing) return;
-        this.paintCell(event.clientX, event.clientY);
+        if(event.shiftKey){
+            this.paintPheromones(event.clientX, event.clientY);
+        }
+        else{
+            this.paintCell(event.clientX, event.clientY);
+        }
+    }
+
+    private updateTooltip(): void {
+        if (this.tooltipCell) {
+            this.cellType = `Cell Type: ${this.tooltipCell.type}`;
+            this.pheromoneInfo = [];
+            for (const pheromoneType in PheromoneType) {
+                    if (Object.prototype.hasOwnProperty.call(PheromoneType, pheromoneType)) {
+                        const key = PheromoneType[pheromoneType as keyof typeof PheromoneType];
+                        const pheromoneValue = this.tooltipCell.pheromones.get(key);
+                        if(pheromoneValue){
+                            const value = typeof pheromoneValue === 'number' ? pheromoneValue : pheromoneValue.length();
+                            if(value <= 0){
+                                continue;
+                            }
+                            let valueString = value.toFixed(8);
+                            if(value < 0.00001){
+                                valueString = '< 0.00001';
+                            }
+                            this.pheromoneInfo.push(`${key}: ${valueString}`);
+                        }
+                    }
+            }
+        } else {
+            this.tooltipStyle = { display: 'none' };
+        }
     }
 
     onMouseUp(): void {
         this.isDrawing = false;
+    }
+
+    onMouseLeave(): void {
+        this.isDrawing = false;
+        this.tooltipCell = null;
     }
 
     private paintCell(clientX: number, clientY: number): void {
@@ -404,6 +504,24 @@ export class AntSimulationComponent implements OnInit, AfterViewInit {
             }
         }
     }    
+
+    private paintPheromones(clientX: number, clientY: number): void {
+        const rect = this.canvas.nativeElement.getBoundingClientRect();
+        const x = clientX - rect.left;
+        const y = clientY - rect.top;
+    
+        const cellX = Math.floor(x / this.cellSize);
+        const cellY = Math.floor(y / this.cellSize);
+
+        const halfBrushSize = Math.floor(this.brushSize / 2);
+        for (let i = -halfBrushSize; i < -halfBrushSize + this.brushSize; i++) {
+            for (let j = -halfBrushSize; j < -halfBrushSize + this.brushSize; j++) {
+                let mouseDirection: Vector2 = new Vector2(clientX,clientY).sub(this.previousMousePosition).normalize();
+                this.gridService.setCellPheromones(cellX + i, cellY + j, mouseDirection, this.selectedPheromoneType, this.amountOfPheromoneToPaint);
+            }
+        }
+        this.previousMousePosition = new Vector2(clientX,clientY);
+    }
 
     saveGrid(): void {
         const filename = 'ant_grid';

@@ -5,6 +5,7 @@ import { Predator } from './predator.model';
 import { PredatorService } from '../services/predator.service';
 import { GridService } from '../services/grid.service';
 import { limitVector, rotateVector } from '../utils/vector-utils';
+import { Grid } from './grid.model';
 
 
 export enum AntState {
@@ -24,6 +25,7 @@ export class Ant {
     public velocity: Vector2;
     public acceleration: Vector2;
     public goalReached: boolean = true;
+    public suffocationFrames: number = 0;
     strongPheromoneTime: number = 50;
 
     constructor(x: number, y: number) {
@@ -53,6 +55,29 @@ export class Ant {
         this.acceleration.multiplyScalar(0);
         this.strongPheromoneTime = 100
         this.switchState();
+    }
+
+    public isSuffocating(gridService: GridService): boolean {
+        if(this.isInsideObstacle(gridService)) {
+            if(this.suffocationFrames > 50){
+                return true;
+            }
+            this.suffocationFrames += Math.floor(Math.random() * 3);
+        }
+        else{
+            this.suffocationFrames = Math.max(0,this.suffocationFrames-1);
+        }
+        return false;
+    }
+
+    public isInsideObstacle(gridService: GridService): boolean {
+        const gridX = Math.floor(this.position.x);
+        const gridY = Math.floor(this.position.y);
+        const cell = gridService.getCell(gridX, gridY);
+        if (cell && cell.type === CellType.Obstacle) {
+            return true;
+        }
+        return false;
     }
 
 //#region Movement
@@ -219,7 +244,7 @@ export class Ant {
         const y = Math.floor(this.position.y);
         const cell = gridService.getCell(x, y);
 
-        if (cell === undefined) {
+        if (cell === undefined || cell.type === CellType.Obstacle) {
             return;
         }
 
@@ -245,7 +270,7 @@ export class Ant {
 
     layScalarPheromonesByType(gridService: GridService, pheromoneType: PheromoneType, quantity: number): void {
         const currentCell = gridService.getCellAtPosition(this.position);
-        if(currentCell === undefined){
+        if(currentCell === undefined || currentCell.type === CellType.Obstacle){
             return;
         }
 

@@ -22,6 +22,7 @@ export class Predator {
     public goalReached: boolean = true;
     public feedingTime: number = 0;
     public digestionTime: number = 100;
+    public suffocationFrames: number = 0;
     strongPheromoneTime: number = 50;
 
     constructor(x: number, y: number) {
@@ -53,6 +54,22 @@ export class Predator {
         this.goalReached = true;
         this.strongPheromoneTime = 100
         this.switchState();
+    }
+
+    public isSuffocating(gridService: GridService): boolean {
+        const gridX = Math.floor(this.position.x);
+        const gridY = Math.floor(this.position.y);
+        const cell = gridService.getCell(gridX, gridY);
+        if (cell && cell.type === CellType.Obstacle) {
+            if(this.suffocationFrames > 50){
+                return true;
+            }
+            this.suffocationFrames += Math.floor(Math.random() * 3);
+        }
+        else{
+            this.suffocationFrames = Math.max(0,this.suffocationFrames-1);
+        }
+        return false;
     }
 
 //#region Movement

@@ -24,6 +24,16 @@ export class Grid {
         }
     }
 
+    public setCellPheromones(x: number, y: number, direction: Vector2, pheromoneType: PheromoneType, amount: number): void {
+        let currentCellPheromone = this.cells[y][x].pheromones.get(pheromoneType);
+        if(typeof(currentCellPheromone) === 'number'){
+            this.cells[y][x].pheromones.set(pheromoneType, amount);
+        }
+        else{
+            this.cells[y][x].pheromones.set(pheromoneType,direction.multiplyScalar(amount));
+        }
+    }
+
     public setCellsFromJson(cellsJson: any[][]): void {
         this.cells = cellsJson.map(row => row.map(cellJson => Cell.fromJson(cellJson)));
     }

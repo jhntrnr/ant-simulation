@@ -15,9 +15,9 @@ import { saveAs } from 'file-saver';
 export class GridService {
     grid!: Grid;
     pheromoneDecayRate: number = 0.0015;
+    pheromoneDiffusionAmount: number = 0.01;
+    pheromonediffusionInterval: number = 300;
     private lastDiffusionTime: number = Date.now();
-    private diffusionInterval: number = 100;
-    private flipFlop: boolean = true;
     constructor(private http: HttpClient, private location: Location) {}
 
     public initializeGrid(width: number, height: number, cellSize: number = 8): void {
@@ -28,7 +28,6 @@ export class GridService {
         this.dissipatePheromones(antService, predatorService, this.pheromoneDecayRate);
         this.diffusePheromones();
     }
-
 
     public dissipatePheromones(antService: AntService, predatorService: PredatorService, dissipationRate: number): void {
         // Create a list of all cell coordinates
@@ -50,11 +49,11 @@ export class GridService {
                         const key = PheromoneType[pheromoneType as keyof typeof PheromoneType];
                         if (typeof(cell.pheromones.get(key)) === 'number') {
                             let scalarPheromone = cell.pheromones.get(key) as number;
-                            scalarPheromone = Math.max(0, scalarPheromone - dissipationRate);
+                            scalarPheromone = Math.max(0, scalarPheromone * (1 - (dissipationRate)));
                             cell.pheromones.set(key, scalarPheromone);
                         } else {
                             let vectorPheromone = cell.pheromones.get(key) as Vector2;
-                            vectorPheromone.multiplyScalar(Math.max(0, 1- dissipationRate));
+                            vectorPheromone.multiplyScalar(Math.max(0, 1 - dissipationRate));
                             if (vectorPheromone.length() < .0000001) {
                                 vectorPheromone.set(0, 0);
                             }
@@ -66,9 +65,8 @@ export class GridService {
     }
 
     diffusePheromones(): void {
-        const diffusionRate = 0.001;
         const currentTime = Date.now();
-        if (currentTime - this.lastDiffusionTime < this.diffusionInterval) {
+        if (currentTime - this.lastDiffusionTime < this.pheromonediffusionInterval) {
             return;
         }
         this.lastDiffusionTime = currentTime;
@@ -84,38 +82,51 @@ export class GridService {
         for (let y = 0; y < this.height; y++) {
             for (let x = 0; x < this.width; x++) {
                 const currentCell = this.getCell(x, y);
-                if (currentCell === undefined || currentCell.type != CellType.Blank) {
+                if (currentCell === undefined || currentCell.type === CellType.Obstacle) {
                     continue;
                 }
                 const neighbors = this.getNeighboringCells(x, y);
-                for (const neighbor of neighbors){
-                    for (const pheromoneType in PheromoneType) {
-                        if (Object.prototype.hasOwnProperty.call(PheromoneType, pheromoneType)) {
-                            const key = PheromoneType[pheromoneType as keyof typeof PheromoneType];
+        
+                for (const pheromoneType in PheromoneType) {
+                    if (Object.prototype.hasOwnProperty.call(PheromoneType, pheromoneType)) {
+                        const key = PheromoneType[pheromoneType as keyof typeof PheromoneType];
+        
+                        let validNeighbors: Cell[] = [];
+        
+                        for (const neighbor of neighbors) {
                             if (typeof(currentCell.pheromones.get(key)) === 'number') {
                                 let scalarPheromone = currentCell.pheromones.get(key) as number;
-                                const totalScalarPheromoneToDistribute = scalarPheromone * diffusionRate * 5;
                                 let neighborScalarPheromone = tempGrid[neighbor.y][neighbor.x].pheromones.get(key) as number;
-                                if(neighborScalarPheromone >= 1){
-                                    tempGrid[neighbor.y][neighbor.x].pheromones.set(key,1);
-                                    continue;
+        
+                                if (scalarPheromone > neighborScalarPheromone && neighborScalarPheromone < 1) {
+                                    validNeighbors.push(neighbor);
                                 }
-                                const scalarPheromoneToAdd = totalScalarPheromoneToDistribute / neighbors.length;
+                            } else {
+                                let vectorPheromone = currentCell.pheromones.get(key) as Vector2;
+                                let neighborVectorPheromone = tempGrid[neighbor.y][neighbor.x].pheromones.get(key) as Vector2;
+        
+                                if (vectorPheromone.length() > neighborVectorPheromone.length() && neighborVectorPheromone.length() < 1) {
+                                    validNeighbors.push(neighbor);
+                                }
+                            }
+                        }
+                        for (const neighbor of validNeighbors) {
+                            if (typeof(currentCell.pheromones.get(key)) === 'number') {
+                                let scalarPheromone = currentCell.pheromones.get(key) as number;
+                                const totalScalarPheromoneToDistribute = scalarPheromone * this.pheromoneDiffusionAmount;
+                                let neighborScalarPheromone = tempGrid[neighbor.y][neighbor.x].pheromones.get(key) as number;
+                                const scalarPheromoneToAdd = totalScalarPheromoneToDistribute;
                                 let tempScalarPheromone = tempGrid[y][x].pheromones.get(key) as number;
                                 tempScalarPheromone -= totalScalarPheromoneToDistribute;
                                 tempGrid[y][x].pheromones.set(key, tempScalarPheromone);
                                 neighborScalarPheromone += scalarPheromoneToAdd;
                                 tempGrid[neighbor.y][neighbor.x].pheromones.set(key, neighborScalarPheromone);
                             }
-                            else{
+                            else {
                                 let vectorPheromone = currentCell.pheromones.get(key) as Vector2;
-                                const totalVectorPheromoneToDistribute = vectorPheromone.clone().multiplyScalar(diffusionRate);
+                                const totalVectorPheromoneToDistribute = vectorPheromone.clone().multiplyScalar(this.pheromoneDiffusionAmount);
                                 let neighborVectorPheromone = tempGrid[neighbor.y][neighbor.x].pheromones.get(key) as Vector2;
-                                if(neighborVectorPheromone.length() >= 1){
-                                    tempGrid[neighbor.y][neighbor.x].pheromones.set(key,neighborVectorPheromone.clampLength(0,1));
-                                    continue;
-                                }
-                                const vectorPheromoneToAdd = totalVectorPheromoneToDistribute.clone().divideScalar(neighbors.length);
+                                const vectorPheromoneToAdd = totalVectorPheromoneToDistribute.clone();
                                 let tempVectorPheromone = tempGrid[y][x].pheromones.get(key) as Vector2;
                                 tempVectorPheromone.sub(vectorPheromoneToAdd);
                                 neighborVectorPheromone.add(vectorPheromoneToAdd);
@@ -163,7 +174,7 @@ export class GridService {
     
                 if (this.isWithinBounds(neighborX, neighborY)) {
                     const neighbor = this.getCell(neighborX, neighborY);
-                    if (neighbor && neighbor.type === CellType.Blank) {
+                    if (neighbor && neighbor.type !== CellType.Obstacle) {
                         neighboringCells.push(neighbor);
                     }
                 }
@@ -192,6 +203,10 @@ export class GridService {
 
     public setCellType(x: number, y: number, cellType: CellType): void {
         this.grid.setCell(x, y, cellType);
+    }
+
+    public setCellPheromones(x: number, y: number, direction: Vector2, pheromoneType: PheromoneType, amount: number): void {
+        this.grid.setCellPheromones(x, y, direction, pheromoneType, amount);
     }
 
     public getCell(x: number, y: number): Cell | undefined {
@@ -396,7 +411,6 @@ export class GridService {
             fileReader.readAsText(file);
         });
     }
-      
 
     private async loadGridFromFileContent(fileContent: string): Promise<void> {
         const gridJSON = JSON.parse(fileContent);
