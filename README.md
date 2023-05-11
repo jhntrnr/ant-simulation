@@ -24,6 +24,9 @@ Pheromones
 - Pheromones dissipate from a cell slowly over time via evaporation.
 - Pheromones diffuse between cells slowly over time.
 
+![Vector2Pheromones](https://github.com/jhntrnr/ant-simulation/assets/90057903/ced10fb6-6ef9-462e-809b-2742479e1bc3)
+
+
 Ant Movement
 - Ants wander randomly in search of their goal (either `Food` or `Ant Spawn`) unless they see a Vector2 pheromone of the correct type, either `Search Pheromone` or `Return Pheromone`.
 - Ants who see such a pheromone will follow its vector field in reverse.
