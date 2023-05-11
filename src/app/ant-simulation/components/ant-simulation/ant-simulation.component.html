@@ -52,7 +52,7 @@
                 </mat-form-field>
                 
                 <mat-form-field appearance="fill">
-                    <mat-label>Paint Pheromone Type (right click to paint pheromones)</mat-label>
+                    <mat-label>Paint Pheromone Type (shift + left click to paint pheromones)</mat-label>
                     <mat-select [(value)]="selectedPheromoneType">
                         <mat-option [value]="pheromoneType" *ngFor="let pheromoneType of pheromoneTypes">{{pheromoneType}}</mat-option>
                     </mat-select>
