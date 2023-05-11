@@ -42,6 +42,7 @@ export class AntSimulationComponent implements OnInit, AfterViewInit {
     showingReturnPheromone: boolean = true;
     showingDistressPheromone: boolean = true;
     viewMode: ViewMode = ViewMode.PaintedPheromones;
+    visualPheromoneStrength: number = 50;
     tooltipCell!: Cell | null;
     tooltipStyle = {};
     cellType = '';
@@ -187,8 +188,8 @@ export class AntSimulationComponent implements OnInit, AfterViewInit {
                     let searchPheromone = cell.pheromones.get(PheromoneType.SearchPheromone) as Vector2;
                     let returnPheromone = cell.pheromones.get(PheromoneType.ReturnPheromone) as Vector2;
                     let distressPheromone = cell.pheromones.get(PheromoneType.DistressPheromone) as number;
-                    const red = this.showingSearchPheromone ? this.clampColorValue(1 - searchPheromone.length()) : 255;
-                    const blue = this.showingReturnPheromone ? this.clampColorValue(1 - returnPheromone.length()) : 255;
+                    const red = this.showingSearchPheromone ? this.clampColorValue(1 - (searchPheromone.length() * this.visualPheromoneStrength)) : 255;
+                    const blue = this.showingReturnPheromone ? this.clampColorValue(1 - (returnPheromone.length() * this.visualPheromoneStrength)) : 255;
                     const green = this.showingDistressPheromone ? this.clampColorValue(1 - distressPheromone) : 255;
                     let cellColor = `rgba(${red}, ${green}, ${blue}, 1)`;
                     if (cell.type === CellType.AntSpawn) {
@@ -248,7 +249,7 @@ export class AntSimulationComponent implements OnInit, AfterViewInit {
     }
     
     private drawArrow(centerX: number, centerY: number, vector: Vector2, arrowSize: number): void {
-        const arrowLength = vector.length() * 100;
+        const arrowLength = vector.length() * this.visualPheromoneStrength;
         if(arrowLength <= 0.00001){
             return;
         }
@@ -310,7 +311,7 @@ export class AntSimulationComponent implements OnInit, AfterViewInit {
             if(!this.showingSearchingAnts && !ant.foodCarrying){
                 return;
             }
-            this.context.fillStyle = ant.foodCarrying  ? 'goldenrod' : 'black';
+            this.context.fillStyle = ant.foodCarrying  ? 'goldenrod' : 'white';
             this.context.strokeStyle = 'black';
             const x = ant.position.x * this.cellSize;
             const y = ant.position.y * this.cellSize;

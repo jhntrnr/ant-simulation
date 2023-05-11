@@ -19,6 +19,11 @@
                       <mat-option *ngFor="let mode of viewModes()" [value]="mode">{{ mode }}</mat-option>
                     </mat-select>
                 </mat-form-field>
+                <mat-form-field appearance="fill">
+                    <mat-label>Visual Pheromone Strength</mat-label>
+                    <input matInput [(ngModel)]="visualPheromoneStrength" name="visualPheromoneStrength">
+                    <mat-slider min="1" max="100" step="1" [(ngModel)]="visualPheromoneStrength" name="visualPheromoneStrength"></mat-slider>
+                </mat-form-field>
                 <div class="buttons-row">
                     <button mat-raised-button color="primary" (click)="toggleSearchingAnts($event)">Hide Searching Ants</button>
                     <button mat-raised-button color="primary" (click)="toggleFoodCarryingAnts($event)">Hide Food-Carrying Ants</button>

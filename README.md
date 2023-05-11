@@ -10,7 +10,7 @@ Ants
 - Ants spawn from blue `Ant Spawn` cells and seek out green `Food` cells.
 - Ants continually spawn from `Ant Spawn` cells until there are `maxAnts` on screen.
 - Ants periodically die, to be replaced by a freshly spawned ant.
-- Ants have two states: `Food Search` (black ants) and `Home Search` (gold ants) that define their current goal and behavior.
+- Ants have two states: `Food Search` (white ants) and `Home Search` (gold ants) that define their current goal and behavior.
 - When in `Food Search` mode, ants lay down `Search Pheromone` in their current cell.
 - When in `Home Search` mode, ants lay down `Return Pheromone` in their current cell.
 - Ants have a limited vision range and limited field of view.
